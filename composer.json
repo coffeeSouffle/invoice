@@ -1,0 +1,16 @@
+{
+    "name": "coffeesouffle/invoice",
+    "authors": [
+        {
+            "name": "Louis Zhan",
+            "email": "louis_zhan@taogo.com.tw"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Invoice\\": "src/"
+        }
+    },
+    "require": {}
+}
