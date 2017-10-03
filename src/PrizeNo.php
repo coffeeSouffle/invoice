@@ -4,20 +4,13 @@ namespace Invoice;
 
 use Invoice\Exceptions\IOException;
 
-use Invoice\PrizeNo\SupperPrizeNo;
-use Invoice\PrizeNo\SpecialPrizeNo;
-use Invoice\PrizeNo\FirstPrizeNo;
-use Invoice\PrizeNo\SecondPrizeNo;
-use Invoice\PrizeNo\ThirdPrizeNo;
-use Invoice\PrizeNo\FourthPrizeNo;
-use Invoice\PrizeNo\FifthPrizeNo;
-use Invoice\PrizeNo\SixthPrizeNo;
-
 class PrizeNo {
 
     public $invoiceStartDate = null;
 
     public $invoiceEndDate = null;
+
+    public $numberOfPeriods = '';
 
     public $prizeNos = array();
 
@@ -48,9 +41,16 @@ class PrizeNo {
     }
 
     public function isWinning($number) {
-        foreach ($this->prizeNos as $obj) {
-            if ($obj->isWinning($number)) {
-                return true;
+
+        if (!preg_match('/^[0-9]{8}$/', $number)) {
+            return false;
+        }
+
+        foreach ($this->prizeNos as $prizeNo => $invoiceNumbers) {
+            foreach ($invoiceNumbers as $invoiceNumber) {
+                if (is_callable(array($this, $prizeNo)) && $this->$prizeNo($number, $invoiceNumber) > 0) {
+                    return true;
+                }
             }
         }
 
@@ -58,9 +58,20 @@ class PrizeNo {
     }
 
     public function getWinningPrizeAmount($number) {
-        foreach ($this->prizeNos as $obj) {
-            if ($obj->isWinning($number)) {
-                return $obj->getPrizeAmount();
+        if (!preg_match('/^[0-9]{8}$/', $number)) {
+            return 0;
+        }
+
+        foreach ($this->prizeNos as $prizeNo => $invoiceNumbers) {
+            foreach ($invoiceNumbers as $invoiceNumber) {
+                if (!is_callable(array($this, $prizeNo))) {
+                    continue;
+                }
+
+                $prizeAmount = $this->$prizeNo($number, $invoiceNumber);
+                if ($prizeAmount > 0) {
+                    return $prizeAmount;
+                }
             }
         }
 
@@ -68,41 +79,127 @@ class PrizeNo {
     }
 
     private function handle($winningList) {
+        foreach ($winningList as $key => $val) {
 
-        if (isset($winningList['superPrizeNo']) && !empty($winningList['superPrizeNo'])) {
-            $this->prizeNos[] = new SupperPrizeNo($winningList['superPrizeNo'], $winningList['superPrizeAmt']);
+            if ($key == 'invoYm' && preg_match('/^([0-9]{3})(0[1-9]|10|11|12)$/', $val, $match)) {
+                $year = 1911 + $match[1];
+                $peroidsLastMonth = $match[2];
+                $peroidsFirstMonth = str_pad(($peroidsLastMonth - 1), 2, '0', STR_PAD_LEFT);
+                $this->numberOfPeriods = $val;
+
+                $taipeiTimeZone = new \DateTimeZone('Asia/Taipei');
+                $UTC = new \DateTimeZone('UTC');
+
+                $startDate = new \DateTime("{$year}-{$peroidsFirstMonth}-01", $taipeiTimeZone);
+                $startDate->setTimezone($UTC);
+                $this->invoiceStartDate = $startDate;
+
+                $lastDate = new \DateTime("{$year}-{$peroidsLastMonth}-".cal_days_in_month(CAL_GREGORIAN, $peroidsLastMonth, $year), $taipeiTimeZone);
+                $lastDate->setTimezone($UTC);
+                $this->invoiceEndDate = $lastDate;
+            }
+
+            if (preg_match('/PrizeAmt$/', $key)) {
+                if ($val <= 0 || !preg_match('/^[0-9]+$/', $val)) {
+                    throw new IOException("{$key} is error. {$val}");
+                }
+
+                $this->prizeAmount[$key] = (int)$val;
+            }
+
+            if (preg_match('/^superPrizeNo$/', $key) && !empty($val)) {
+                
+                if (!preg_match('/^[0-9]{8}$/', $val)) {
+                    throw new IOException("{$key} is error. {$val}");
+                }
+
+                $this->prizeNos[$key][] = $val;
+            }
+
+            if (preg_match('/^(spcPrizeNo)[23]?$/', $key, $match) && !empty($val)) {
+                
+                if (!preg_match('/^[0-9]{8}$/', $val)) {
+                    throw new IOException("{$key} is error. {$val}");
+                }
+
+                $this->prizeNos[$match[1]][] = $val;
+            }
+
+            if (preg_match('/^(firstPrizeNo)(?:[1-9]|10)$/', $key, $match) && !empty($val)) {
+
+                if (!preg_match('/^[0-9]{8}$/', $val)) {
+                    throw new IOException("{$key} is error. {$val}");
+                }
+
+                $this->prizeNos[$match[1]][] = $val;
+            }
+
+            if (preg_match('/^(sixthPrizeNo)(?:[1-6])$/', $key, $match) && !empty($val)) {
+
+                if (!preg_match('/^[0-9]{3}$/', $val)) {
+                    throw new IOException("{$key} is error. {$val}");
+                }
+
+                $this->prizeNos[$match[1]][] = $val;
+            }
+        }
+    }
+
+    private function superPrizeNo($number, $invoiceNumber) {
+        if ($number == $invoiceNumber) {
+            return $this->prizeAmount['superPrizeAmt'];
         }
 
-        if (isset($winningList['spcPrizeNo']) && !empty($winningList['spcPrizeNo'])) {
-            $this->prizeNos[] = new SpecialPrizeNo($winningList['spcPrizeNo'], $winningList['spcPrizeAmt']);
+        return 0;
+    }
+
+    private function spcPrizeNo($number, $invoiceNumber) {
+        if ($number == $invoiceNumber) {
+            return $this->prizeAmount['spcPrizeAmt'];
         }
 
-        if (isset($winningList['spcPrizeNo2']) && !empty($winningList['spcPrizeNo2'])) {
-            $this->prizeNos[] = new SpecialPrizeNo($winningList['spcPrizeNo2'], $winningList['spcPrizeAmt']);
+        return 0;
+    }
+
+    private function firstPrizeNo($number, $invoiceNumber) {
+        $num = (string)abs($number - $invoiceNumber);
+
+        if ($num == 0) {
+            return $this->prizeAmount['firstPrizeAmt'];
         }
 
-        if (isset($winningList['spcPrizeNo3']) && !empty($winningList['spcPrizeNo3'])) {
-            $this->prizeNos[] = new SpecialPrizeNo($winningList['spcPrizeNo3'], $winningList['spcPrizeAmt']);
-        }
-
-        for ($i = 1; $i <= 10; $i++) {
-            $key = 'firstPrizeNo'.$i;
-            if (isset($winningList[$key]) && !empty($winningList[$key])) {
-                $val = $winningList[$key];
-                $this->prizeNos[] = new FirstPrizeNo($val, $winningList['firstPrizeAmt']);
-                $this->prizeNos[] = new SecondPrizeNo($val, $winningList['secondPrizeAmt']);
-                $this->prizeNos[] = new ThirdPrizeNo($val, $winningList['thirdPrizeAmt']);
-                $this->prizeNos[] = new FourthPrizeNo($val, $winningList['fourthPrizeAmt']);
-                $this->prizeNos[] = new FifthPrizeNo($val, $winningList['fifthPrizeAmt']);
-                $this->prizeNos[] = new SixthPrizeNo($val, $winningList['sixthPrizeAmt']);
+        $flag = 0;
+        for ($i = strlen($num) - 1; $i >= 0; $i--) {
+            if ($num[$i] == '0') {
+                $flag++;
+            } else {
+                break;
             }
         }
 
-        for ($i = 1; $i <= 6; $i++) {
-            $key = 'sixthPrizeNo'.$i;
-            if (isset($winningList[$key]) && !empty($winningList[$key])) {
-                $this->prizeNos[] = new SixthPrizeNo($winningList[$key], $winningList['sixthPrizeAmt']);
-            }
+        switch ($flag) {
+            case 7:
+                return $this->prizeAmount['secondPrizeAmt'];
+            case 6:
+                return $this->prizeAmount['thirdPrizeAmt'];
+            case 5:
+                return $this->prizeAmount['fourthPrizeAmt'];
+            case 4:
+                return $this->prizeAmount['fifthPrizeAmt'];
+            case 3:
+                return $this->prizeAmount['sixthPrizeAmt'];
         }
+
+        return 0;
+    }
+
+    private function sixthPrizeNo($number, $invoiceNumber) {
+        $num = abs($number - $invoiceNumber)%1000;
+
+        if ($num == 0) {
+            return $this->prizeAmount['sixthPrizeAmt'];
+        }
+
+        return 0;
     }
 }
