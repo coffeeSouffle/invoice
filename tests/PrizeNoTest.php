@@ -2,6 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use Invoice\PrizeNo;
+use Invoice\Exceptions\IOException;
 
 final class PrizeNoTest extends TestCase
 {
@@ -76,6 +77,73 @@ final class PrizeNoTest extends TestCase
         $number = '99999474';
         $prizeNo = new Invoice\PrizeNo($this->invoice);
         $this->assertEquals(200, $prizeNo->getWinningPrizeAmount($number));
+
+        $number = '9';
+        $prizeNo = new Invoice\PrizeNo($this->invoice);
+        $this->assertEquals(0, $prizeNo->getWinningPrizeAmount($number));
+    }
+
+    public function testConstructError() {
+        
+        $this->expectException(Invoice\Exceptions\IOException::class);
+        $codeErrorInvoice = array(
+            'code' => 400,
+        );
+        $prizeNo = new Invoice\PrizeNo($codeErrorInvoice);
+    }
+
+    public function testConstructDataFormatError() {
+        $this->expectException(Invoice\Exceptions\IOException::class);
+        $prizeNo = new Invoice\PrizeNo(array());
+    }
+
+    public function testGetPrizeNos() {
+        $prizeNo = new Invoice\PrizeNo($this->invoice);
+        $result = array(
+            'superPrizeNo' => array(
+                '33612092',
+            ),
+            'spcPrizeNo' => array(
+                '06840705',
+            ),
+            'firstPrizeNo' => array(
+                '12182003',
+                '48794532',
+                '77127885',
+            ),
+            'sixthPrizeNo' => array(
+                '136',
+                '873',
+                '474',
+            ),
+        );
+        $this->assertEquals($result, $prizeNo->getPrizeNos());
+    }
+
+    public function testIsWinning() {
+        $number = '99999474';
+        $prizeNo = new Invoice\PrizeNo($this->invoice);
+        $this->assertTrue($prizeNo->isWinning($number));
+
+        $number = '';
+        $prizeNo = new Invoice\PrizeNo($this->invoice);
+        $this->assertFalse($prizeNo->isWinning($number));
+
+        $number = '99999475';
+        $prizeNo = new Invoice\PrizeNo($this->invoice);
+        $this->assertFalse($prizeNo->isWinning($number));
+    }
+
+    public function testGetInvoiceStartDate() {
+        $date = new DateTime('2017-06-30 16:00:00', new DateTimeZone('UTC'));
+        $prizeNo = new Invoice\PrizeNo($this->invoice);
+        $this->assertEquals($date, $prizeNo->getInvoiceStartDate());
+    }
+
+    public function testGetInvoiceEndDate() {
+        $date = new DateTime('2017-08-30 16:00:00', new DateTimeZone('UTC'));
+        $prizeNo = new Invoice\PrizeNo($this->invoice);
+        $this->assertEquals($date, $prizeNo->getInvoiceEndDate());
     }
 
     public function setDown() {
