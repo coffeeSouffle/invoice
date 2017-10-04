@@ -48,7 +48,7 @@ class PrizeNo {
 
         foreach ($this->prizeNos as $prizeNo => $invoiceNumbers) {
             foreach ($invoiceNumbers as $invoiceNumber) {
-                if (is_callable(array($this, $prizeNo)) && $this->$prizeNo($number, $invoiceNumber) > 0) {
+                if ($this->$prizeNo($number, $invoiceNumber) > 0) {
                     return true;
                 }
             }
@@ -64,10 +64,6 @@ class PrizeNo {
 
         foreach ($this->prizeNos as $prizeNo => $invoiceNumbers) {
             foreach ($invoiceNumbers as $invoiceNumber) {
-                if (!is_callable(array($this, $prizeNo))) {
-                    continue;
-                }
-
                 $prizeAmount = $this->$prizeNo($number, $invoiceNumber);
                 if ($prizeAmount > 0) {
                     return $prizeAmount;
@@ -142,6 +138,50 @@ class PrizeNo {
 
                 $this->prizeNos[$match[1]][] = $val;
             }
+        }
+
+        if (!isset($this->prizeNos['superPrizeNo'])) {
+            throw new IOException("superPrizeNo is empty.");
+        }
+
+        if (!isset($this->prizeNos['spcPrizeNo'])) {
+            throw new IOException("spcPrizeNo is empty.");
+        }
+
+        if (!isset($this->prizeNos['firstPrizeNo'])) {
+            throw new IOException("firstPrizeNo is empty.");
+        }
+
+        if (!isset($this->prizeAmount['superPrizeAmt'])) {
+            throw new IOException("superPrizeAmt is empty.");
+        }
+
+        if (!isset($this->prizeAmount['spcPrizeAmt'])) {
+            throw new IOException("spcPrizeAmt is empty.");
+        }
+
+        if (!isset($this->prizeAmount['firstPrizeAmt'])) {
+            throw new IOException("firstPrizeAmt is empty.");
+        }
+
+        if (!isset($this->prizeAmount['secondPrizeAmt'])) {
+            throw new IOException("secondPrizeAmt is empty.");
+        }
+
+        if (!isset($this->prizeAmount['thirdPrizeAmt'])) {
+            throw new IOException("thirdPrizeAmt is empty.");
+        }
+
+        if (!isset($this->prizeAmount['fourthPrizeAmt'])) {
+            throw new IOException("fourthPrizeAmt is empty.");
+        }
+
+        if (!isset($this->prizeAmount['fifthPrizeAmt'])) {
+            throw new IOException("fifthPrizeAmt is empty.");
+        }
+
+        if (!isset($this->prizeAmount['sixthPrizeAmt'])) {
+            throw new IOException("sixthPrizeAmt is empty.");
         }
     }
 
